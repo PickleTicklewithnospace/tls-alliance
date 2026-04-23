@@ -67,8 +67,31 @@ function pickAvoiding(len, recent, avoidWindow) {
   return pick;
 }
 
-function buildStrip(pool, startIdx, finalIdx, totalSteps) {
+// Like pickAvoiding but draws from an explicit list of allowed pool
+// indices (used to exclude already-picked members from the spinner).
+function pickAvoidingFrom(allowed, recent, avoidWindow) {
+  const n = allowed.length;
+  if (n === 0) return 0; // defensive; buildAllowed guarantees non-empty
+  const lookBack = Math.min(avoidWindow, n - 1);
+  const forbidden = new Set();
+  for (let i = recent.length - 1; i >= 0 && forbidden.size < lookBack; i--) {
+    forbidden.add(recent[i]);
+  }
+  // Filter allowed by forbidden; if everything is forbidden (small pool)
+  // just relax and pick anything from allowed.
+  const candidates = allowed.filter((idx) => !forbidden.has(idx));
+  const pickFrom = candidates.length > 0 ? candidates : allowed;
+  return pickFrom[Math.floor(Math.random() * pickFrom.length)];
+}
+
+function buildStrip(pool, startIdx, finalIdx, totalSteps, allowedIdxSet) {
+  // `allowedIdxSet` (optional) restricts which pool indices may be used as
+  // RANDOM fillers in the strip. The fixed cells `startIdx` and `finalIdx`
+  // are always included verbatim regardless of membership; this lets the
+  // currently-centered idle card (which may be an already-picked person
+  // visually) and the upcoming winner remain at their required positions.
   const len = pool.length;
+  const allowed = buildAllowed(allowedIdxSet, len, [startIdx, finalIdx]);
   // Build the index sequence left-to-right, ensuring no duplicate appears
   // within any window of VISIBLE+1 consecutive cells (i.e. each new index
   // differs from the previous VISIBLE indices). VISIBLE+1 covers the case
@@ -84,7 +107,7 @@ function buildStrip(pool, startIdx, finalIdx, totalSteps) {
 
   // padLeft - free random with no-duplicate window constraint.
   for (let i = 0; i < padCount; i++) {
-    indices.push(pickAvoiding(len, indices, AVOID));
+    indices.push(pickAvoidingFrom(allowed, indices, AVOID));
   }
   // startIdx is fixed (must align with the currently visible center). If
   // it collides with the recent window we accept it - the visual continuity
@@ -93,19 +116,38 @@ function buildStrip(pool, startIdx, finalIdx, totalSteps) {
   indices.push(startIdx);
   // middle fillers
   for (let i = 0; i < totalSteps - 1; i++) {
-    indices.push(pickAvoiding(len, indices, AVOID));
+    indices.push(pickAvoidingFrom(allowed, indices, AVOID));
   }
   // finalIdx is fixed. To still keep the window unique around it, we made
   // sure middle cells avoid duplicates of recent picks; if finalIdx happens
   // to clash with the trailing window we re-pick the last few middles to
   // resolve the conflict.
-  resolveSeamConflict(indices, finalIdx, len, AVOID);
+  resolveSeamConflictFrom(indices, finalIdx, allowed, AVOID);
   indices.push(finalIdx);
   // padRight
   for (let i = 0; i < padCount; i++) {
-    indices.push(pickAvoiding(len, indices, AVOID));
+    indices.push(pickAvoidingFrom(allowed, indices, AVOID));
   }
   return indices.map((idx, i) => ({ ...pool[idx], _i: i, _idx: idx }));
+}
+
+// Build the list of pool indices that are allowed as RANDOM fillers in
+// the strip. If no allow-set is provided, every index is allowed. If
+// the allow-set is too small to fill VISIBLE distinct cells we top it
+// up with `must` (the fixed cells) so the carousel can still render
+// without runaway rejection-sampling, but never with completely
+// unrelated picked people.
+function buildAllowed(allowedIdxSet, len, must = []) {
+  if (!allowedIdxSet) {
+    return Array.from({ length: len }, (_, i) => i);
+  }
+  const out = Array.from(allowedIdxSet);
+  if (out.length === 0) {
+    // Pool exhausted - fall back to the must-include cells so we can
+    // still render *something* without crashing.
+    for (const m of must) if (m != null && !out.includes(m)) out.push(m);
+  }
+  return out;
 }
 
 // If the fixed index `fixedIdx` would collide with one of the trailing
@@ -130,15 +172,50 @@ function resolveSeamConflict(indices, fixedIdx, len, avoidWindow) {
   }
 }
 
+// Variant of resolveSeamConflict that draws replacements only from the
+// allowed pool (so already-picked people don't get spliced in).
+function resolveSeamConflictFrom(indices, fixedIdx, allowed, avoidWindow) {
+  const n = allowed.length;
+  const lookBack = Math.min(avoidWindow, n - 1);
+  for (let back = 1; back <= lookBack && indices.length - back >= 0; back++) {
+    const pos = indices.length - back;
+    if (indices[pos] !== fixedIdx) continue;
+    const forbidden = new Set([fixedIdx]);
+    for (let j = Math.max(0, pos - lookBack); j < pos; j++) forbidden.add(indices[j]);
+    for (let j = pos + 1; j < indices.length && j <= pos + lookBack; j++)
+      forbidden.add(indices[j]);
+    const candidates = allowed.filter((idx) => !forbidden.has(idx));
+    const pickFrom = candidates.length > 0 ? candidates : allowed.filter((i) => i !== fixedIdx);
+    if (pickFrom.length === 0) continue;
+    indices[pos] = pickFrom[Math.floor(Math.random() * pickFrom.length)];
+  }
+}
+
 // For the idle/landed states (no spin in progress) we still need a strip
-// so the ribbon renders. Just show the centered card surrounded by random
-// neighbours.
-function buildIdleStrip(pool, centerIdx) {
+// so the ribbon renders. Show the centered card surrounded by neighbours
+// drawn ONLY from `allowedIdxSet` (so already-picked members don't appear
+// in the spinner). Falls back to walking the full pool if no set given.
+function buildIdleStrip(pool, centerIdx, allowedIdxSet) {
   const len = pool.length;
+  const allowed = allowedIdxSet
+    ? Array.from(allowedIdxSet).filter((i) => i !== centerIdx)
+    : null;
   const out = [];
   for (let slot = 0; slot < VISIBLE; slot++) {
-    const offset = slot - CENTER;
-    const idx = ((centerIdx + offset) % len + len) % len;
+    if (slot === CENTER) {
+      out.push({ ...pool[centerIdx], _i: slot, _idx: centerIdx });
+      continue;
+    }
+    let idx;
+    if (allowed && allowed.length > 0) {
+      // Walk through `allowed` deterministically so neighbours are unique
+      // and stable across re-renders for the same centerIdx + allowed set.
+      const k = slot < CENTER ? slot : slot - 1; // 0..VISIBLE-2
+      idx = allowed[k % allowed.length];
+    } else {
+      const offset = slot - CENTER;
+      idx = ((centerIdx + offset) % len + len) % len;
+    }
     out.push({ ...pool[idx], _i: slot, _idx: idx });
   }
   return out;
@@ -177,6 +254,21 @@ export default function RandomPersonSelector({
   // count actual picks by filtering out empty/sparse entries.
   const pickCount = selected.filter(Boolean).length;
 
+  // Set of pool indices NOT yet picked. Used to filter the spinner so the
+  // visible strip never shows an already-picked person. We identify picked
+  // people by their `id` because the slot-indexed `selected` array stores
+  // a copy (with extra fields) rather than the original pool object.
+  const allowedIdxSet = useMemo(() => {
+    const pickedIds = new Set(
+      selected.filter(Boolean).map((p) => p.id),
+    );
+    const out = new Set();
+    for (let i = 0; i < pool.length; i++) {
+      if (!pickedIds.has(pool[i].id)) out.add(i);
+    }
+    return out;
+  }, [selected, pool]);
+
   // Pre-determined lineup of pool indices (length up to TARGET_SELECTIONS).
   // Built once on mount and rebuilt only on reset. The next pick is always
   // lineup[selected.length] - guaranteed unique and the full roster is
@@ -198,7 +290,7 @@ export default function RandomPersonSelector({
 
   // Roll-time strip and offset. When phase === 'idle'|'landed' we render the
   // idle strip and ignore offset/duration.
-  const [strip, setStrip] = useState(() => buildIdleStrip(PORTRAITS, 0));
+  const [strip, setStrip] = useState(() => buildIdleStrip(PORTRAITS, 0, null));
   const [offset, setOffset] = useState(0);    // index of leftmost visible
   const [duration, setDuration] = useState(0); // current transition (ms)
 
@@ -342,11 +434,11 @@ export default function RandomPersonSelector({
   // the landed highlight.
   useEffect(() => {
     if (phase === 'idle') {
-      setStrip(buildIdleStrip(pool, centerIdx));
+      setStrip(buildIdleStrip(pool, centerIdx, allowedIdxSet));
       setOffset(0);
       setDuration(0);
     }
-  }, [phase, centerIdx, pool]);
+  }, [phase, centerIdx, pool, allowedIdxSet]);
 
   function roll() {
     if (phase === 'rolling' || pool.length === 0) return;
@@ -359,9 +451,20 @@ export default function RandomPersonSelector({
     const finalIdx = nextEntry.poolIdx;
     const schedule = buildSchedule();
     const totalSteps = schedule.length;
-    const startIdx = centerIdx;
+    // The starting (left-most fixed) cell of the spin strip must NOT be a
+    // person who has already been picked - otherwise as the strip slides
+    // leftward that cell briefly remains visible alongside fresh
+    // candidates. If the previously-centered card is already picked
+    // (typical: it was the winner of the last roll), substitute any
+    // unpicked pool index for the start cell.
+    const pickedIds = new Set(selected.filter(Boolean).map((p) => p.id));
+    let startIdx = centerIdx;
+    if (pickedIds.has(pool[startIdx]?.id)) {
+      const allowedArr = Array.from(allowedIdxSet);
+      startIdx = allowedArr.length > 0 ? allowedArr[0] : centerIdx;
+    }
 
-    const newStrip = buildStrip(pool, startIdx, finalIdx, totalSteps);
+    const newStrip = buildStrip(pool, startIdx, finalIdx, totalSteps, allowedIdxSet);
     // Initial offset positions startIdx at the center of the viewport.
     // Strip layout: [padLeft (CENTER+2) | startIdx | middle (totalSteps-1) | finalIdx | padRight]
     // startIdx is at strip index = padLeft.length = CENTER + 2.
@@ -476,7 +579,7 @@ export default function RandomPersonSelector({
     // Build an idle-style strip centered on the chosen winner so the
     // viewport renders 5 unique surrounding cards immediately, with no
     // transition.
-    setStrip(buildIdleStrip(pool, finalIdx));
+    setStrip(buildIdleStrip(pool, finalIdx, allowedIdxSet));
     setOffset(0);
     setDuration(0);
     setCenterIdx(finalIdx);
