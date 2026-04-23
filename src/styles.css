@@ -525,6 +525,15 @@ body::after {
   /* Tall portrait card */
   aspect-ratio: 3 / 5.2;
   width: 100%;
+  transition: transform 0.3s cubic-bezier(0.2, 0.8, 0.2, 1),
+              filter 0.3s ease;
+}
+
+@media (hover: hover) {
+  .flip-card:hover {
+    transform: translateY(-4px) scale(1.03);
+    filter: drop-shadow(0 6px 14px rgba(212, 175, 55, 0.35));
+  }
 }
 
 .flip-card:focus-visible .flip-card__inner {
