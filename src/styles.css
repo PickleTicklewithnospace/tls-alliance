@@ -422,9 +422,35 @@ body::after {
   color: var(--text-muted);
 }
 
+.footer__side {
+  flex: 1 1 0;
+  display: flex;
+  align-items: center;
+  gap: 3rem;
+  flex-wrap: wrap;
+}
+
+.footer__side--left {
+  justify-content: flex-end;
+}
+
+.footer__side--right {
+  justify-content: flex-start;
+}
+
 .footer__emblem {
+  flex: 0 0 auto;
   font-size: 2rem;
   color: var(--gold);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.footer__emblem img {
+  width: 2.5rem;
+  height: 2.5rem;
+  object-fit: contain;
 }
 
 /* Responsive */

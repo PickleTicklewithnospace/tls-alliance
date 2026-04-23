@@ -15,16 +15,21 @@ function Item({ icon, label, value, sub }) {
 export default function Footer() {
   return (
     <footer className='footer'>
-      <Item icon='◆' label='Content'
-        value={META.content.label} sub={META.content.sub} />
-      <Item icon='📅' label='Date'
-        value={META.date.label} sub={META.date.sub} />
-      <div className='footer__emblem' aria-hidden='true'>🛡</div>
-      <Item icon='' label='FC'
-        value={META.fc.label} sub={META.fc.sub} />
-      <Item icon='⚔' label='Mission'
-        value={META.mission.label} sub={META.mission.sub} />
-      <Item icon='🐤' label='' value={META.motto} />
+      <div className='footer__side footer__side--left'>
+        <Item icon='◆' label='Content'
+          value={META.content.label} sub={META.content.sub} />
+        <Item icon='📅' label='Date'
+          value={META.date.label} sub={META.date.sub} />
+      </div>
+      <div className='footer__emblem' aria-hidden='true'>
+        <img src={`${import.meta.env.BASE_URL}misc/bread2.png`} alt='' />
+      </div>
+      <div className='footer__side footer__side--right'>
+        <Item icon='' label='FC'
+          value={META.fc.label} sub={META.fc.sub} />
+        <Item icon='⚔' label='Mission'
+          value={META.mission.label} sub={META.mission.sub} />
+      </div>
     </footer>
   );
 }
