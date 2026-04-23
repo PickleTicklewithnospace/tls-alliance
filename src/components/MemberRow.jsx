@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { ROLE_LABEL } from '../data';
+import { playClose } from '../lib/sounds';
 
 // A single alliance slot. Default state shows "???" (face-down). When the
 // slot's pick is made the card flips to reveal a panel with the picked
@@ -26,7 +27,7 @@ export default function MemberRow({ index, role, revealed }) {
   useEffect(() => {
     if (!expanded) return;
     function onKey(e) {
-      if (e.key === 'Escape') setExpanded(false);
+      if (e.key === 'Escape') closeExpanded();
     }
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
@@ -34,6 +35,11 @@ export default function MemberRow({ index, role, revealed }) {
 
   function handleCardClick() {
     if (revealed) setExpanded(true);
+  }
+
+  function closeExpanded() {
+    setExpanded(false);
+    playClose();
   }
 
   return (
@@ -96,7 +102,8 @@ export default function MemberRow({ index, role, revealed }) {
           className='portrait-lightbox'
           role='dialog'
           aria-label={`Expanded portrait: ${revealed.name}`}
-          onClick={() => setExpanded(false)}
+          onClick={closeExpanded}
+          data-no-ui-sound
         >
           <div
             className='portrait-lightbox__card'
@@ -118,8 +125,9 @@ export default function MemberRow({ index, role, revealed }) {
             </div>
             <button
               className='portrait-lightbox__close'
-              onClick={() => setExpanded(false)}
+              onClick={closeExpanded}
               aria-label='Close'
+              data-no-ui-sound
             >
               ×
             </button>

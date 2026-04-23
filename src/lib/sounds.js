@@ -7,8 +7,10 @@
 let ctx = null;
 let cursorBuffer = null;
 let acceptBuffer = null;
+let closeBuffer = null;
 let cursorGain = null;
 let acceptGain = null;
+let closeGain = null;
 let initStarted = false;
 
 function init() {
@@ -24,6 +26,9 @@ function init() {
     acceptGain = ctx.createGain();
     acceptGain.gain.value = 0.6;
     acceptGain.connect(ctx.destination);
+    closeGain = ctx.createGain();
+    closeGain.gain.value = 0.6;
+    closeGain.connect(ctx.destination);
 
     const base = import.meta.env.BASE_URL;
     fetch(`${base}sounds/cursor_trimmed.mp3`)
@@ -35,6 +40,11 @@ function init() {
       .then((r) => r.arrayBuffer())
       .then((b) => ctx.decodeAudioData(b))
       .then((d) => { acceptBuffer = d; })
+      .catch(() => {});
+    fetch(`${base}sounds/close_trimmed.mp3`)
+      .then((r) => r.arrayBuffer())
+      .then((b) => ctx.decodeAudioData(b))
+      .then((d) => { closeBuffer = d; })
       .catch(() => {});
   } catch { /* best-effort */ }
 }
@@ -63,6 +73,13 @@ export function playAccept() {
     window.__acceptPlayCount = (window.__acceptPlayCount || 0) + 1;
   }
   play(acceptBuffer, acceptGain);
+}
+export function playClose() {
+  init();
+  if (typeof window !== 'undefined') {
+    window.__closePlayCount = (window.__closePlayCount || 0) + 1;
+  }
+  play(closeBuffer, closeGain);
 }
 
 // CSS selector matching all elements that should trigger the global
