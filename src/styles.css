@@ -53,7 +53,7 @@ body::before {
       rgba(5, 5, 15, 0.92) 80%,
       rgba(5, 5, 15, 1) 100%
     ),
-    url('/tls-alliance/background.jpg');
+    url('../background.jpg');
   background-repeat: no-repeat, no-repeat;
   background-position: top center, top center;
   background-size: cover, cover;
@@ -196,13 +196,11 @@ body::after {
 
 .portrait--left {
   left: 0;
-  background-image: url('/tls-alliance/left-portrait-mirrored.jpg');
   background-position: left top;
 }
 
 .portrait--right {
   right: 0;
-  background-image: url('/tls-alliance/left-portrait-mirrored.jpg');
   background-position: right top;
 }
 
