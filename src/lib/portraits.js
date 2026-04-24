@@ -93,9 +93,15 @@ function rolesFor(file) {
   return ROLE_SIGNUPS[key] ? [...ROLE_SIGNUPS[key]] : ['dps'];
 }
 
-// Deterministic priority in [0, 10). Drives pickGroup ordering.
-function priorityFor(file) {
-  return (hashStr(file + '|p') >>> 24) % 10;
+// Priority is flattened to 0 for everyone: there is no real signup data
+// behind these numbers, and a hashed priority just creates artificial
+// "low priority" portraits (e.g. Godric) who never get picked. With all
+// priorities equal, the within-tier weighted shuffle in pickGroup is the
+// sole ordering signal, so role-count fairness applies across the whole
+// pool. Kept as a function (not a constant) so future real signup data
+// can plug in here without touching callers.
+function priorityFor(_file) {
+  return 0;
 }
 
 function fileToPerson(file) {

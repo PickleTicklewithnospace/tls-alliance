@@ -40,7 +40,7 @@ export const INITIAL_LINEUP_NAMES = [
   // Alliance A
   'Coo Kie',         // tank
   'Lue Xion',        // healer
-  'Renzy Kun',       // healer
+  'Cino Cinnamon',   // healer (replaces Renzy)
   "Chi's Keki",      // dps
   'Raiden Woltz',    // dps
   'Yeme Chevalcroix',// dps

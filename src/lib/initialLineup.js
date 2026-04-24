@@ -7,6 +7,8 @@ import { findPortraitByName } from './portraits';
 // resolve to a known portrait are skipped (slot stays empty / "???").
 export function buildInitialSelected() {
   return INITIAL_LINEUP_NAMES.map((name, slot) => {
+    // Intentionally empty slot (e.g. dropped attendee, to be rerolled in UI).
+    if (!name) return undefined;
     const person = findPortraitByName(name);
     if (!person) {
       // eslint-disable-next-line no-console

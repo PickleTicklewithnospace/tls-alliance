@@ -127,13 +127,22 @@ function boundedIndex(rng, n) {
 }
 
 /**
- * Stable-by-priority but random-within-tier ordering.
+ * Stable-by-priority but weighted-random-within-tier ordering.
  * Assumes input is already sorted by priority desc.
  *
+ * Within each priority tier we order people via a weighted shuffle where
+ * each person's weight is 1 / max(1, roles.length)^2. The squared term
+ * gives a stronger bias toward single-role signups: a 1-role person has
+ * 4x the weight of a 2-role person and 9x a 3-role person. The effect:
+ * single-role signups (e.g. DPS-only) are noticeably more likely to land
+ * earlier in the pick order than people who signed up for multiple roles,
+ * evening out the chance of being picked. Nobody is guaranteed and nobody
+ * is excluded - it's a probabilistic nudge, not a hard cap.
+ *
  * @template T
- * @param {Array<T & {priority:number}>} sortedDesc
+ * @param {Array<T & {priority:number, roles:string[]}>} sortedDesc
  * @param {() => number} rng
- * @returns {Array<T & {priority:number}>}
+ * @returns {Array<T & {priority:number, roles:string[]}>}
  */
 function shuffleEqualPriorityTiers(sortedDesc, rng) {
   const out = [];
@@ -142,17 +151,36 @@ function shuffleEqualPriorityTiers(sortedDesc, rng) {
     let j = i + 1;
     while (j < sortedDesc.length && sortedDesc[j].priority === sortedDesc[i].priority) j++;
     const tier = sortedDesc.slice(i, j);
-    fisherYates(tier, rng);
-    out.push(...tier);
+    out.push(...weightedShuffle(tier, rng, (p) => {
+      const n = Math.max(1, p.roles.length);
+      return 1 / (n * n);
+    }));
     i = j;
   }
   return out;
 }
 
-/** In-place Fisher–Yates shuffle. */
-function fisherYates(arr, rng) {
-  for (let i = arr.length - 1; i > 0; i--) {
-    const k = Math.floor(rng() * (i + 1));
-    [arr[i], arr[k]] = [arr[k], arr[i]];
-  }
+/**
+ * Weighted random ordering via the "exponential trick": for each item draw
+ * a key = -ln(U) / w (U uniform in (0,1]) and sort ascending by key. This
+ * is mathematically equivalent to repeatedly sampling without replacement
+ * proportional to the weights, but runs in O(n log n) and uses only the
+ * supplied rng. Items with higher weight tend to land earlier.
+ *
+ * @template T
+ * @param {T[]} arr
+ * @param {() => number} rng
+ * @param {(item: T) => number} weightFn  Must return a positive finite weight.
+ * @returns {T[]}
+ */
+function weightedShuffle(arr, rng, weightFn) {
+  const keyed = arr.map((item) => {
+    const w = weightFn(item);
+    const safeW = w > 0 && Number.isFinite(w) ? w : Number.MIN_VALUE;
+    // Clamp U away from 0 so -ln(U) is finite.
+    const u = Math.max(rng(), Number.MIN_VALUE);
+    return { item, key: -Math.log(u) / safeW };
+  });
+  keyed.sort((a, b) => a.key - b.key);
+  return keyed.map((k) => k.item);
 }
