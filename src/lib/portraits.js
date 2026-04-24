@@ -111,4 +111,14 @@ function fileToPerson(file) {
   };
 }
 
-export const PORTRAITS = PORTRAIT_FILES.map(fileToPerson);
+// Portraits explicitly excluded from the random roll pool. Their image files
+// remain in the repo (and may still be referenced elsewhere), but they will
+// never be selected by pickGroup / the RandomPersonSelector.
+const EXCLUDED_FROM_ROLL = new Set([
+  'Persius Vladymir.png',
+  'Red Raven.png',
+]);
+
+export const PORTRAITS = PORTRAIT_FILES
+  .filter((file) => !EXCLUDED_FROM_ROLL.has(file))
+  .map(fileToPerson);
