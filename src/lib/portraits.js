@@ -122,3 +122,17 @@ const EXCLUDED_FROM_ROLL = new Set([
 export const PORTRAITS = PORTRAIT_FILES
   .filter((file) => !EXCLUDED_FROM_ROLL.has(file))
   .map(fileToPerson);
+
+// Look up a portrait by display name (apostrophes optional / ignored, case
+// insensitive, non-alphanumerics ignored). Returns the person record produced
+// by fileToPerson, or null if no match. Used to seed the initial hardcoded
+// alliance lineup from a list of names.
+export function findPortraitByName(name) {
+  const norm = (s) => s.toLowerCase().replace(/[^a-z0-9]/g, '');
+  const target = norm(name);
+  for (const file of PORTRAIT_FILES) {
+    const base = file.replace(/\.[^.]+$/, '').replace(/_/g, "'");
+    if (norm(base) === target) return fileToPerson(file);
+  }
+  return null;
+}

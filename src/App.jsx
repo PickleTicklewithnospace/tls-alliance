@@ -4,6 +4,7 @@ import Header from './components/Header';
 import Footer from './components/Footer';
 import AllianceCard from './components/AllianceCard';
 import RandomPersonSelector from './components/RandomPersonSelector';
+import { buildInitialSelected } from './lib/initialLineup';
 
 // Timing for the "fly" reveal animation. The picked portrait first
 // expands to the centre of the screen (over all UI), pauses briefly,
@@ -18,7 +19,9 @@ export default function App() {
   // C0..C7) so each pick lands in its predetermined alliance position
   // regardless of reveal order. (Reveal order is tank → healer → DPS,
   // but slot positions remain fixed per alliance.)
-  const [selected, setSelected] = useState([]);
+  // Seed with the hardcoded post-roll lineup so all 24 slots are revealed
+  // on first load. Reset clears this back to "???" (it does NOT re-seed).
+  const [selected, setSelected] = useState(() => buildInitialSelected());
 
   // Fly-overlay state. While set, a fixed-position portrait is animated
   // across the screen; the alliance slot it targets stays "???" until
